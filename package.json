@@ -1,0 +1,19 @@
+{
+  "name": "plc-generator",
+  "version": "1.0.0",
+  "description": "Generador de código PLC multiplataforma (Allen-Bradley, Siemens, Mitsubishi)",
+  "main": "src/plc.js",
+  "scripts": {
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/ tests/"
+  },
+  "keywords": ["plc", "generator", "allen-bradley", "siemens", "mitsubishi"],
+  "author": "Darkusbymaster",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "eslint": "^8.57.0"
+  }
+}
