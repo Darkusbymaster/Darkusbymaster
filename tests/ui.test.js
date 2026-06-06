@@ -1,129 +1,218 @@
 /**
  * Pruebas unitarias para el módulo UI (src/ui.js)
- * Cubre: processPLC y la integración con el DOM
+ * Cubre: initUI, updateBrandInfo, processPLC, downloadCode, copyCode, showNotification
  */
 
-const { generatePLCCode, repairPLCCode, downloadFile } = require("../src/plc.js");
+const { plcTypes, getPLCCategories, generatePLCCode, repairPLCCode, downloadFile } = require("../src/plc.js");
 
-// Exponer funciones globales para que ui.js las encuentre
+// Exponer funciones globales para ui.js
+global.plcTypes = plcTypes;
+global.getPLCCategories = getPLCCategories;
 global.generatePLCCode = generatePLCCode;
 global.repairPLCCode = repairPLCCode;
-global.downloadFile = downloadFile;
+global.downloadFile = jest.fn();
 
-const { processPLC } = require("../src/ui.js");
+const { initUI, updateBrandInfo, processPLC, downloadCode, copyCode, showNotification } = require("../src/ui.js");
 
-describe("processPLC (integración con DOM)", () => {
-    let alertMock;
-    let downloadFileMock;
+function setupDOM() {
+    document.body.innerHTML = `
+        <div id="notifications"></div>
+        <select id="plcType"></select>
+        <div id="brandInfo"></div>
+        <input type="number" id="inputs" value="2">
+        <input type="number" id="outputs" value="1">
+        <textarea id="codeOutput"></textarea>
+    `;
+}
 
-    beforeEach(() => {
-        // Configurar DOM simulado
-        document.body.innerHTML = `
-            <select id="plcType">
-                <option value="Allen-Bradley" selected>Allen-Bradley</option>
-                <option value="Siemens">Siemens</option>
-                <option value="Mitsubishi">Mitsubishi</option>
-            </select>
-            <input type="number" id="inputs" value="2">
-            <input type="number" id="outputs" value="1">
-            <textarea id="codeOutput"></textarea>
-        `;
+describe("initUI", () => {
+    beforeEach(setupDOM);
+    afterEach(() => { document.body.innerHTML = ""; });
 
-        alertMock = jest.fn();
-        global.alert = alertMock;
-        global.downloadFile = jest.fn();
+    test("debe poblar el selector con optgroups por categoría", () => {
+        initUI();
+        const optgroups = document.querySelectorAll("optgroup");
+        expect(optgroups.length).toBe(4);
     });
 
-    afterEach(() => {
-        jest.restoreAllMocks();
+    test("debe tener opciones para todos los PLCs", () => {
+        initUI();
+        const options = document.querySelectorAll("option");
+        expect(options.length).toBe(Object.keys(plcTypes).length);
+    });
+
+    test("debe etiquetar correctamente las categorías", () => {
+        initUI();
+        const labels = Array.from(document.querySelectorAll("optgroup")).map(g => g.label);
+        expect(labels).toContain("Americanos");
+        expect(labels).toContain("Europeos");
+        expect(labels).toContain("Japoneses");
+        expect(labels).toContain("Asiáticos/Otros");
+    });
+
+    test("debe actualizar brandInfo al inicializar", () => {
+        initUI();
+        const info = document.getElementById("brandInfo").textContent;
+        expect(info.length).toBeGreaterThan(0);
+    });
+
+    test("no debe fallar si el select no existe", () => {
         document.body.innerHTML = "";
+        expect(() => initUI()).not.toThrow();
+    });
+});
+
+describe("updateBrandInfo", () => {
+    beforeEach(() => {
+        setupDOM();
+        initUI();
+    });
+    afterEach(() => { document.body.innerHTML = ""; });
+
+    test("debe mostrar marca y lenguaje del PLC seleccionado", () => {
+        document.getElementById("plcType").value = "Allen-Bradley";
+        updateBrandInfo();
+        const info = document.getElementById("brandInfo").textContent;
+        expect(info).toContain("Rockwell Automation");
+        expect(info).toContain("LD");
     });
 
-    test("debe generar código y mostrarlo en el textarea", () => {
+    test("debe actualizarse al cambiar tipo", () => {
+        document.getElementById("plcType").value = "Siemens (S7-1200/1500)";
+        updateBrandInfo();
+        const info = document.getElementById("brandInfo").textContent;
+        expect(info).toContain("Siemens");
+        expect(info).toContain("SCL");
+    });
+});
+
+describe("processPLC", () => {
+    beforeEach(() => {
+        setupDOM();
+        initUI();
+        global.alert = jest.fn();
+    });
+    afterEach(() => { document.body.innerHTML = ""; });
+
+    test("debe generar código y mostrarlo en textarea", () => {
+        document.getElementById("inputs").value = "3";
+        document.getElementById("outputs").value = "2";
         processPLC();
         const output = document.getElementById("codeOutput").value;
-        expect(output).toContain("LD");
         expect(output.length).toBeGreaterThan(0);
     });
 
-    test("debe mostrar alerta de éxito", () => {
-        processPLC();
-        expect(alertMock).toHaveBeenCalledWith("¡Código PLC Generado con éxito!");
-    });
-
-    test("debe llamar a downloadFile con el código generado", () => {
-        processPLC();
-        expect(global.downloadFile).toHaveBeenCalledWith(
-            expect.any(String),
-            "codigo_plc.txt"
-        );
-    });
-
-    test("debe usar el tipo de PLC seleccionado", () => {
-        document.getElementById("plcType").value = "Siemens";
-        processPLC();
-        const output = document.getElementById("codeOutput").value;
-        expect(output).toContain("Siemens");
-    });
-
-    test("debe generar entradas según el valor del input", () => {
-        document.getElementById("inputs").value = "3";
+    test("debe mostrar warning si entradas y salidas son 0", () => {
+        document.getElementById("inputs").value = "0";
         document.getElementById("outputs").value = "0";
         processPLC();
-        const output = document.getElementById("codeOutput").value;
-        expect(output).toContain("X1");
-        expect(output).toContain("X2");
-        expect(output).toContain("X3");
+        const notifications = document.querySelectorAll(".notification.warning");
+        expect(notifications.length).toBe(1);
     });
 
-    test("debe generar salidas según el valor del input", () => {
-        document.getElementById("inputs").value = "0";
-        document.getElementById("outputs").value = "2";
+    test("debe generar código para PLC Siemens S7-1200", () => {
+        document.getElementById("plcType").value = "Siemens (S7-1200/1500)";
+        document.getElementById("inputs").value = "2";
+        document.getElementById("outputs").value = "1";
         processPLC();
         const output = document.getElementById("codeOutput").value;
-        expect(output).toContain("Y1");
-        expect(output).toContain("Y2");
+        expect(output).toContain("PROGRAM");
+        expect(output).toContain("%I");
     });
 
-    test("debe manejar valores vacíos como cero", () => {
-        document.getElementById("inputs").value = "";
+    test("debe manejar valores no numéricos como 0", () => {
+        document.getElementById("inputs").value = "abc";
         document.getElementById("outputs").value = "";
         processPLC();
-        const output = document.getElementById("codeOutput").value;
-        expect(output).not.toContain("X1");
-        expect(output).not.toContain("Y1");
+        // Should show warning since both parsed as 0
+        const notifications = document.querySelectorAll(".notification.warning");
+        expect(notifications.length).toBe(1);
+    });
+});
+
+describe("downloadCode", () => {
+    beforeEach(() => {
+        setupDOM();
+        initUI();
+        global.downloadFile = jest.fn();
+    });
+    afterEach(() => { document.body.innerHTML = ""; });
+
+    test("debe mostrar warning si no hay código", () => {
+        document.getElementById("codeOutput").value = "";
+        downloadCode();
+        const warnings = document.querySelectorAll(".notification.warning");
+        expect(warnings.length).toBe(1);
     });
 
-    test("debe manejar valores no numéricos como cero", () => {
-        document.getElementById("inputs").value = "abc";
-        document.getElementById("outputs").value = "xyz";
-        processPLC();
-        const output = document.getElementById("codeOutput").value;
-        expect(output).not.toContain("X1");
-        expect(output).not.toContain("Y1");
-    });
-
-    test("debe aplicar repairPLCCode al código generado", () => {
-        document.getElementById("inputs").value = "1";
-        document.getElementById("outputs").value = "1";
+    test("debe llamar downloadFile con nombre basado en tipo de PLC", () => {
+        document.getElementById("codeOutput").value = "LD X1\nOUT Y1";
         document.getElementById("plcType").value = "Allen-Bradley";
-        processPLC();
-        const output = document.getElementById("codeOutput").value;
-        // repairPLCCode elimina espacios después de "LD " y "OT "
-        // El header "LD Allen-Bradley" se convierte en "LDAllen-Bradley"
-        expect(output).toContain("LDAllen-Bradley");
+        downloadCode();
+        expect(global.downloadFile).toHaveBeenCalledWith(
+            "LD X1\nOUT Y1",
+            expect.stringContaining("allen_bradley")
+        );
+    });
+});
+
+describe("copyCode", () => {
+    beforeEach(() => {
+        setupDOM();
+        initUI();
+    });
+    afterEach(() => { document.body.innerHTML = ""; });
+
+    test("debe mostrar warning si no hay código", () => {
+        document.getElementById("codeOutput").value = "";
+        copyCode();
+        const warnings = document.querySelectorAll(".notification.warning");
+        expect(warnings.length).toBe(1);
     });
 
-    test("debe funcionar con Mitsubishi y múltiples I/O", () => {
-        document.getElementById("plcType").value = "Mitsubishi";
-        document.getElementById("inputs").value = "2";
-        document.getElementById("outputs").value = "2";
-        processPLC();
-        const output = document.getElementById("codeOutput").value;
-        expect(output).toContain("Mitsubishi");
-        expect(output).toContain("X1");
-        expect(output).toContain("X2");
-        expect(output).toContain("Y1");
-        expect(output).toContain("Y2");
+    test("debe copiar al clipboard si hay código", () => {
+        document.getElementById("codeOutput").value = "LD X1";
+        const writeTextMock = jest.fn(() => Promise.resolve());
+        Object.assign(navigator, { clipboard: { writeText: writeTextMock } });
+        copyCode();
+        expect(writeTextMock).toHaveBeenCalledWith("LD X1");
+    });
+
+    test("debe usar execCommand como fallback", () => {
+        document.getElementById("codeOutput").value = "LD X1";
+        Object.assign(navigator, { clipboard: undefined });
+        const execMock = jest.fn();
+        document.execCommand = execMock;
+        copyCode();
+        expect(execMock).toHaveBeenCalledWith("copy");
+    });
+});
+
+describe("showNotification", () => {
+    beforeEach(setupDOM);
+    afterEach(() => { document.body.innerHTML = ""; });
+
+    test("debe crear elemento notification con clase correcta", () => {
+        showNotification("Test", "success");
+        const notif = document.querySelector(".notification.success");
+        expect(notif).not.toBeNull();
+        expect(notif.textContent).toBe("Test");
+    });
+
+    test("debe crear warning notification", () => {
+        showNotification("Advertencia", "warning");
+        const notif = document.querySelector(".notification.warning");
+        expect(notif).not.toBeNull();
+    });
+
+    test("debe crear error notification", () => {
+        showNotification("Error", "error");
+        const notif = document.querySelector(".notification.error");
+        expect(notif).not.toBeNull();
+    });
+
+    test("no debe fallar si container no existe", () => {
+        document.body.innerHTML = "";
+        expect(() => showNotification("test", "success")).not.toThrow();
     });
 });

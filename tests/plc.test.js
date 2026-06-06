@@ -1,184 +1,219 @@
 /**
  * Pruebas unitarias para el módulo de lógica PLC (src/plc.js)
- * Cubre: generatePLCCode, repairPLCCode, downloadFile, plcTypes
+ * Cubre: plcTypes, getPLCCategories, generatePLCCode, repairPLCCode, downloadFile
  */
 
-const { plcTypes, generatePLCCode, repairPLCCode, downloadFile } = require("../src/plc.js");
+const { plcTypes, getPLCCategories, generatePLCCode, repairPLCCode, downloadFile } = require("../src/plc.js");
 
 describe("plcTypes", () => {
-    test("debe contener los tres tipos de PLC soportados", () => {
-        expect(plcTypes).toHaveProperty("Allen-Bradley");
-        expect(plcTypes).toHaveProperty("Siemens");
-        expect(plcTypes).toHaveProperty("Mitsubishi");
+    test("debe contener al menos 30 tipos de PLC", () => {
+        expect(Object.keys(plcTypes).length).toBeGreaterThanOrEqual(30);
     });
 
-    test("cada tipo debe tener un prefijo LD seguido del nombre", () => {
-        expect(plcTypes["Allen-Bradley"]).toBe("LD Allen-Bradley");
-        expect(plcTypes["Siemens"]).toBe("LD Siemens");
-        expect(plcTypes["Mitsubishi"]).toBe("LD Mitsubishi");
+    test("cada tipo debe tener prefix, inputTag, outputTag, separator, brand", () => {
+        for (const [name, config] of Object.entries(plcTypes)) {
+            expect(config).toHaveProperty("prefix");
+            expect(config).toHaveProperty("inputTag");
+            expect(config).toHaveProperty("outputTag");
+            expect(config).toHaveProperty("separator");
+            expect(config).toHaveProperty("brand");
+            expect(typeof config.prefix).toBe("string");
+            expect(typeof config.brand).toBe("string");
+        }
+    });
+
+    test("debe incluir los principales fabricantes", () => {
+        expect(plcTypes).toHaveProperty("Allen-Bradley");
+        expect(plcTypes).toHaveProperty("Siemens (S7-300/400)");
+        expect(plcTypes).toHaveProperty("Siemens (S7-1200/1500)");
+        expect(plcTypes).toHaveProperty("Mitsubishi (MELSEC-Q)");
+        expect(plcTypes).toHaveProperty("Omron (CJ/CP)");
+        expect(plcTypes).toHaveProperty("Schneider (Modicon)");
+        expect(plcTypes).toHaveProperty("ABB (AC500)");
+        expect(plcTypes).toHaveProperty("Beckhoff (TwinCAT)");
+        expect(plcTypes).toHaveProperty("Delta (DVP)");
+        expect(plcTypes).toHaveProperty("Keyence (KV)");
+    });
+
+    test("los prefijos deben ser lenguajes válidos (LD, ST, STL, SCL, IL)", () => {
+        const validPrefixes = ["LD", "ST", "STL", "SCL", "IL"];
+        for (const config of Object.values(plcTypes)) {
+            expect(validPrefixes).toContain(config.prefix);
+        }
+    });
+});
+
+describe("getPLCCategories", () => {
+    test("debe retornar 4 categorías regionales", () => {
+        const categories = getPLCCategories();
+        expect(Object.keys(categories)).toHaveLength(4);
+        expect(categories).toHaveProperty("Americanos");
+        expect(categories).toHaveProperty("Europeos");
+        expect(categories).toHaveProperty("Japoneses");
+        expect(categories).toHaveProperty("Asiáticos/Otros");
+    });
+
+    test("cada PLC en categorías debe existir en plcTypes", () => {
+        const categories = getPLCCategories();
+        for (const plcs of Object.values(categories)) {
+            for (const plc of plcs) {
+                expect(plcTypes).toHaveProperty(plc);
+            }
+        }
+    });
+
+    test("todos los PLCs de plcTypes deben estar en alguna categoría", () => {
+        const categories = getPLCCategories();
+        const allCategorized = Object.values(categories).flat();
+        for (const plcName of Object.keys(plcTypes)) {
+            expect(allCategorized).toContain(plcName);
+        }
     });
 });
 
 describe("generatePLCCode", () => {
-    describe("generación básica por tipo de PLC", () => {
-        test("debe generar código Allen-Bradley sin entradas ni salidas", () => {
-            const result = generatePLCCode("Allen-Bradley", 0, 0);
-            expect(result).toBe("LD Allen-Bradley");
+    describe("generación Ladder (LD)", () => {
+        test("Allen-Bradley con entradas y salidas", () => {
+            const result = generatePLCCode("Allen-Bradley", 2, 1);
+            expect(result).toContain("Rockwell Automation");
+            expect(result).toContain("LD   I:1");
+            expect(result).toContain("LD   I:2");
+            expect(result).toContain("OUT  O:1");
         });
 
-        test("debe generar código Siemens sin entradas ni salidas", () => {
-            const result = generatePLCCode("Siemens", 0, 0);
-            expect(result).toBe("LD Siemens");
+        test("Mitsubishi MELSEC-Q con formato X/Y", () => {
+            const result = generatePLCCode("Mitsubishi (MELSEC-Q)", 2, 2);
+            expect(result).toContain("Mitsubishi Electric");
+            expect(result).toContain("LD   X1");
+            expect(result).toContain("OUT  Y1");
         });
 
-        test("debe generar código Mitsubishi sin entradas ni salidas", () => {
-            const result = generatePLCCode("Mitsubishi", 0, 0);
-            expect(result).toBe("LD Mitsubishi");
-        });
-    });
-
-    describe("generación con entradas", () => {
-        test("debe generar una entrada correctamente", () => {
-            const result = generatePLCCode("Allen-Bradley", 1, 0);
-            expect(result).toContain("X1 LD");
-        });
-
-        test("debe generar múltiples entradas numeradas secuencialmente", () => {
-            const result = generatePLCCode("Siemens", 3, 0);
-            expect(result).toContain("X1 LD");
-            expect(result).toContain("X2 LD");
-            expect(result).toContain("X3 LD");
-        });
-
-        test("cada entrada debe estar en una nueva línea", () => {
-            const result = generatePLCCode("Allen-Bradley", 2, 0);
-            const lines = result.split("\n");
-            expect(lines[1]).toBe("X1 LD");
-            expect(lines[2]).toBe("X2 LD");
+        test("Delta DVP con formato X/Y", () => {
+            const result = generatePLCCode("Delta (DVP)", 1, 1);
+            expect(result).toContain("Delta Electronics");
+            expect(result).toContain("LD   X1");
+            expect(result).toContain("OUT  Y1");
         });
     });
 
-    describe("generación con salidas", () => {
-        test("debe generar una salida correctamente", () => {
-            const result = generatePLCCode("Mitsubishi", 0, 1);
-            expect(result).toContain("Y1 OT");
+    describe("generación Texto Estructurado (ST/SCL)", () => {
+        test("Siemens S7-1200/1500 genera SCL", () => {
+            const result = generatePLCCode("Siemens (S7-1200/1500)", 2, 1);
+            expect(result).toContain("PROGRAM PLC_Main");
+            expect(result).toContain("VAR");
+            expect(result).toContain("%I.1 : BOOL");
+            expect(result).toContain("%Q.1 : BOOL");
+            expect(result).toContain("END_VAR");
+            expect(result).toContain(":=");
+            expect(result).toContain("END_PROGRAM");
         });
 
-        test("debe generar múltiples salidas numeradas secuencialmente", () => {
-            const result = generatePLCCode("Allen-Bradley", 0, 3);
-            expect(result).toContain("Y1 OT");
-            expect(result).toContain("Y2 OT");
-            expect(result).toContain("Y3 OT");
+        test("ABB AC500 genera ST", () => {
+            const result = generatePLCCode("ABB (AC500)", 1, 1);
+            expect(result).toContain("PROGRAM PLC_Main");
+            expect(result).toContain("DI_1 : BOOL");
+            expect(result).toContain("DO_1 : BOOL");
         });
 
-        test("cada salida debe estar en una nueva línea", () => {
-            const result = generatePLCCode("Siemens", 0, 2);
-            const lines = result.split("\n");
-            expect(lines[1]).toBe("Y1 OT");
-            expect(lines[2]).toBe("Y2 OT");
+        test("Beckhoff TwinCAT genera ST con naming específico", () => {
+            const result = generatePLCCode("Beckhoff (TwinCAT)", 1, 1);
+            expect(result).toContain("bInput_1 : BOOL");
+            expect(result).toContain("bOutput_1 : BOOL");
+        });
+
+        test("Omron NX/NJ genera ST", () => {
+            const result = generatePLCCode("Omron (NX/NJ)", 2, 2);
+            expect(result).toContain("Input_1 : BOOL");
+            expect(result).toContain("Output_1 : BOOL");
+            expect(result).toContain("Output_1 := Input_1");
         });
     });
 
-    describe("generación combinada (entradas + salidas)", () => {
-        test("debe generar entradas antes que salidas", () => {
-            const result = generatePLCCode("Allen-Bradley", 2, 2);
-            const lines = result.split("\n");
-            expect(lines[0]).toBe("LD Allen-Bradley");
-            expect(lines[1]).toBe("X1 LD");
-            expect(lines[2]).toBe("X2 LD");
-            expect(lines[3]).toBe("Y1 OT");
-            expect(lines[4]).toBe("Y2 OT");
+    describe("generación Lista de Instrucciones STL", () => {
+        test("Siemens S7-300/400 genera STL", () => {
+            const result = generatePLCCode("Siemens (S7-300/400)", 2, 1);
+            expect(result).toContain("A    I.1");
+            expect(result).toContain("A    I.2");
+            expect(result).toContain("=    Q.1");
         });
 
-        test("debe manejar muchas entradas y salidas", () => {
-            const result = generatePLCCode("Siemens", 10, 5);
-            const lines = result.split("\n");
-            expect(lines).toHaveLength(16); // 1 header + 10 inputs + 5 outputs
+        test("VIPA genera STL compatible Siemens", () => {
+            const result = generatePLCCode("VIPA", 1, 1);
+            expect(result).toContain("A    I.1");
+            expect(result).toContain("=    Q.1");
+        });
+    });
+
+    describe("generación Lista de Instrucciones IL (IEC)", () => {
+        test("Schneider Modicon genera IL", () => {
+            const result = generatePLCCode("Schneider (Modicon)", 2, 1);
+            expect(result).toContain("LD   %I.1");
+            expect(result).toContain("LD   %I.2");
+            expect(result).toContain("ST   %Q.1");
         });
     });
 
     describe("casos límite", () => {
-        test("debe retornar cadena vacía para tipo de PLC no reconocido", () => {
-            const result = generatePLCCode("Desconocido", 0, 0);
+        test("debe retornar cadena vacía para tipo no reconocido", () => {
+            const result = generatePLCCode("PLCInventado", 1, 1);
             expect(result).toBe("");
         });
 
-        test("debe retornar solo entradas/salidas para tipo no reconocido con I/O", () => {
-            const result = generatePLCCode("Otro", 1, 1);
-            expect(result).toBe("\nX1 LD\nY1 OT");
+        test("debe generar solo header con 0 entradas y 0 salidas", () => {
+            const result = generatePLCCode("Allen-Bradley", 0, 0);
+            expect(result).toContain("Rockwell Automation");
+            expect(result).not.toContain("LD   I");
+            expect(result).not.toContain("OUT  O");
         });
 
         test("debe manejar entradas negativas como cero", () => {
-            const result = generatePLCCode("Allen-Bradley", -1, 0);
-            expect(result).toBe("LD Allen-Bradley");
+            const result = generatePLCCode("Allen-Bradley", -3, 0);
+            expect(result).not.toContain("LD   I");
         });
 
-        test("debe manejar salidas negativas como cero", () => {
-            const result = generatePLCCode("Allen-Bradley", 0, -5);
-            expect(result).toBe("LD Allen-Bradley");
+        test("debe generar código para todos los tipos sin errores", () => {
+            for (const type of Object.keys(plcTypes)) {
+                const result = generatePLCCode(type, 2, 2);
+                expect(result.length).toBeGreaterThan(0);
+                expect(result).toContain(plcTypes[type].brand);
+            }
         });
     });
 });
 
 describe("repairPLCCode", () => {
-    test("debe eliminar espacio después de LD", () => {
-        const input = "X1 LD ";
+    test("debe normalizar múltiples espacios", () => {
+        const input = "LD    X1";
         const result = repairPLCCode(input);
-        expect(result).toBe("X1 LD");
+        expect(result).toBe("LD  X1");
     });
 
-    test("debe eliminar espacio después de OT", () => {
-        const input = "Y1 OT ";
+    test("debe eliminar espacios al final de línea", () => {
+        const input = "LD X1   \nOUT Y1  ";
         const result = repairPLCCode(input);
-        expect(result).toBe("Y1 OT");
+        expect(result).toBe("LD X1\nOUT Y1");
     });
 
-    test("debe reparar múltiples ocurrencias de LD con espacio", () => {
-        const input = "X1 LD \nX2 LD \nX3 LD ";
+    test("debe normalizar saltos de línea Windows a Unix", () => {
+        const input = "LD X1\r\nOUT Y1\r\n";
         const result = repairPLCCode(input);
-        expect(result).not.toContain("LD ");
-    });
-
-    test("debe reparar múltiples ocurrencias de OT con espacio", () => {
-        const input = "Y1 OT \nY2 OT ";
-        const result = repairPLCCode(input);
-        expect(result).not.toContain("OT ");
-    });
-
-    test("no debe modificar código sin espacios post-LD/OT en instrucciones", () => {
-        const input = "X1 LD\nY1 OT";
-        const result = repairPLCCode(input);
-        expect(result).toBe("X1 LD\nY1 OT");
-    });
-
-    test("debe modificar el header LD si contiene espacio (comportamiento esperado)", () => {
-        const input = "LD Allen-Bradley\nX1 LD\nY1 OT";
-        const result = repairPLCCode(input);
-        // La función reemplaza TODOS los "LD " incluyendo el header
-        expect(result).toBe("LDAllen-Bradley\nX1 LD\nY1 OT");
+        expect(result).not.toContain("\r");
+        expect(result).toContain("\n");
     });
 
     test("debe manejar cadena vacía", () => {
-        const result = repairPLCCode("");
-        expect(result).toBe("");
+        expect(repairPLCCode("")).toBe("");
     });
 
-    test("debe manejar código sin instrucciones LD u OT", () => {
-        const input = "HEADER\nDATA 123";
-        const result = repairPLCCode(input);
-        expect(result).toBe("HEADER\nDATA 123");
+    test("no debe modificar código limpio", () => {
+        const clean = "PROGRAM PLC_Main\nVAR\n  DI_1 : BOOL;\nEND_VAR";
+        expect(repairPLCCode(clean)).toBe(clean);
     });
 
-    test("debe reparar combinación de LD y OT con espacios", () => {
-        const input = "LD Allen-Bradley\nX1 LD \nY1 OT ";
+    test("debe manejar múltiples problemas combinados", () => {
+        const input = "LD    X1   \r\nOUT    Y1   \r\n";
         const result = repairPLCCode(input);
-        expect(result).toBe("LDAllen-Bradley\nX1 LD\nY1 OT");
-    });
-
-    test("debe eliminar todos los espacios post-LD incluso en el header", () => {
-        const input = "LD Siemens";
-        const result = repairPLCCode(input);
-        expect(result).toBe("LDSiemens");
+        expect(result).toBe("LD  X1\nOUT  Y1\n");
     });
 });
 
@@ -197,54 +232,46 @@ describe("downloadFile", () => {
         jest.restoreAllMocks();
     });
 
-    test("debe crear un Blob con el contenido proporcionado", () => {
-        const content = "LD Allen-Bradley\nX1 LD";
-        downloadFile(content, "test.txt");
+    test("debe crear un Blob con el contenido", () => {
+        downloadFile("LD X1", "test.txt");
         expect(createObjectURLMock).toHaveBeenCalledTimes(1);
-        const blobArg = createObjectURLMock.mock.calls[0][0];
-        expect(blobArg).toBeInstanceOf(Blob);
+        const blob = createObjectURLMock.mock.calls[0][0];
+        expect(blob).toBeInstanceOf(Blob);
     });
 
-    test("debe crear un enlace con el nombre de archivo correcto", () => {
+    test("debe usar el nombre de archivo correcto", () => {
         const clickMock = jest.fn();
         jest.spyOn(document, "createElement").mockReturnValue({
-            href: "",
-            download: "",
-            click: clickMock,
+            href: "", download: "", click: clickMock
         });
         jest.spyOn(document.body, "appendChild").mockImplementation(() => {});
         jest.spyOn(document.body, "removeChild").mockImplementation(() => {});
 
-        downloadFile("contenido", "archivo.txt");
-        
+        downloadFile("contenido", "plc_code.txt");
         const anchor = document.createElement.mock.results[0].value;
-        expect(anchor.download).toBe("archivo.txt");
+        expect(anchor.download).toBe("plc_code.txt");
     });
 
-    test("debe ejecutar click en el enlace para iniciar descarga", () => {
+    test("debe ejecutar click para iniciar descarga", () => {
         const clickMock = jest.fn();
         jest.spyOn(document, "createElement").mockReturnValue({
-            href: "",
-            download: "",
-            click: clickMock,
+            href: "", download: "", click: clickMock
         });
         jest.spyOn(document.body, "appendChild").mockImplementation(() => {});
         jest.spyOn(document.body, "removeChild").mockImplementation(() => {});
 
-        downloadFile("contenido", "archivo.txt");
+        downloadFile("data", "file.txt");
         expect(clickMock).toHaveBeenCalledTimes(1);
     });
 
-    test("debe revocar la URL del objeto después de descargar", () => {
+    test("debe revocar URL después de descarga", () => {
         jest.spyOn(document, "createElement").mockReturnValue({
-            href: "",
-            download: "",
-            click: jest.fn(),
+            href: "", download: "", click: jest.fn()
         });
         jest.spyOn(document.body, "appendChild").mockImplementation(() => {});
         jest.spyOn(document.body, "removeChild").mockImplementation(() => {});
 
-        downloadFile("contenido", "archivo.txt");
+        downloadFile("data", "file.txt");
         expect(revokeObjectURLMock).toHaveBeenCalledWith("blob:http://localhost/fake-url");
     });
 });
