@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLC Generator Móvil</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background-color: #f4f6f9; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); max-width: 500px; margin: 0 auto; }
+        h2 { margin-top: 0; color: #1e3a8a; font-size: 1.4rem; text-align: center; }
+        label { font-weight: bold; display: block; margin: 12px 0 6px; font-size: 0.9rem; }
+        select, input, textarea { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
+        button { width: 100%; background-color: #2563eb; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        button:active { background-color: #1d4ed8; }
+        textarea { font-family: monospace; background-color: #f8fafc; resize: none; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>⚡ Generator PLC Multiplataforma</h2>
+    
+    <label>Tipo de PLC:</label>
+    <select id="plcType">
+        <option value="Allen-Bradley">Allen-Bradley</option>
+        <option value="Siemens">Siemens</option>
+        <option value="Mitsubishi">Mitsubishi</option>
+    </select>
+
+    <label>Número de Entradas:</label>
+    <input type="number" id="inputs" value="0" min="0">
+
+    <label>Número de Salidas:</label>
+    <input type="number" id="outputs" value="0" min="0">
+
+    <button onclick="processPLC()">Generar Código</button>
+
+    <label>Código Resultante:</label>
+    <textarea id="codeOutput" rows="8" readonly></textarea>
+</div>
+
+<script src="src/plc.js"></script>
+<script src="src/ui.js"></script>
+
+</body>
+</html>
