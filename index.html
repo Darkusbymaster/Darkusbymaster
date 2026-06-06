@@ -3,44 +3,775 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PLC Generator Móvil</title>
+    <meta name="description" content="Generador de código PLC multiplataforma - Allen-Bradley, Siemens, Mitsubishi, Omron y más">
+    <meta name="theme-color" content="#1e3a5f">
+    <link rel="manifest" href="manifest.json">
+    <title>PLC Code Generator Pro</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 20px; background-color: #f4f6f9; color: #333; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); max-width: 500px; margin: 0 auto; }
-        h2 { margin-top: 0; color: #1e3a8a; font-size: 1.4rem; text-align: center; }
-        label { font-weight: bold; display: block; margin: 12px 0 6px; font-size: 0.9rem; }
-        select, input, textarea { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
-        button { width: 100%; background-color: #2563eb; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: bold; margin-top: 20px; cursor: pointer; }
-        button:active { background-color: #1d4ed8; }
-        textarea { font-family: monospace; background-color: #f8fafc; resize: none; margin-top: 15px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary: #1e3a5f;
+            --primary-light: #2d5a8e;
+            --accent: #00d4aa;
+            --accent-dark: #00b894;
+            --bg: #0f1923;
+            --bg-card: #1a2d3d;
+            --bg-input: #0d1b2a;
+            --text: #e8f0f8;
+            --text-muted: #8ba4b8;
+            --border: #2a4560;
+            --success: #00d4aa;
+            --warning: #ffa726;
+            --error: #ef5350;
+            --radius: 12px;
+            --shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: 
+                radial-gradient(ellipse at 20% 50%, rgba(0,212,170,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(45,90,142,0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 80%, rgba(30,58,95,0.1) 0%, transparent 50%);
+            z-index: -1;
+            animation: bgPulse 8s ease-in-out infinite alternate;
+        }
+
+        @keyframes bgPulse {
+            0% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 30px 20px 20px;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent), var(--primary-light));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 15px rgba(0,212,170,0.3);
+        }
+
+        .logo h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), #fff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+
+        /* Main container */
+        .container {
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 0 16px 40px;
+        }
+
+        /* Card */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+
+        .card-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent);
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+
+        /* Form elements */
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            margin-top: 14px;
+        }
+
+        label:first-of-type { margin-top: 0; }
+
+        select, input[type="number"] {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 0.95rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0,212,170,0.15);
+        }
+
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238ba4b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
+        }
+
+        optgroup { font-weight: bold; color: var(--accent); background: #1a2d3d; }
+        option { color: #e8f0f8; background: #1a2d3d; padding: 8px; }
+        select option:checked { background: var(--accent); color: #0f1923; }
+
+        /* Brand info badge */
+        .brand-info {
+            display: inline-block;
+            background: rgba(0,212,170,0.1);
+            border: 1px solid rgba(0,212,170,0.2);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.72rem;
+            color: var(--accent);
+            margin-top: 8px;
+        }
+
+        /* Input row */
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 14px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+            color: #0f1923;
+            box-shadow: 0 4px 15px rgba(0,212,170,0.3);
+        }
+
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,212,170,0.4); }
+        .btn-primary:active { transform: translateY(0); }
+
+        .btn-secondary {
+            background: var(--bg-input);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* Code output */
+        .code-area {
+            position: relative;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 180px;
+            padding: 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--accent);
+            font-family: "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+            font-size: 0.82rem;
+            line-height: 1.6;
+            resize: vertical;
+        }
+
+        textarea:focus { outline: none; border-color: var(--accent); }
+
+        .code-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn-sm {
+            padding: 8px 14px;
+            font-size: 0.78rem;
+            border-radius: 6px;
+        }
+
+        /* Notifications */
+        #notifications {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .notification {
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .notification.success { background: rgba(0,212,170,0.15); border: 1px solid var(--success); color: var(--success); }
+        .notification.warning { background: rgba(255,167,38,0.15); border: 1px solid var(--warning); color: var(--warning); }
+        .notification.error { background: rgba(239,83,80,0.15); border: 1px solid var(--error); color: var(--error); }
+        .notification.fade-out { opacity: 0; transition: opacity 0.3s; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Platform badges */
+        .platforms {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .platform-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.72rem;
+        }
+
+        /* Language selector */
+        .lang-selector {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+        }
+
+        .lang-selector select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+        }
+
+        /* AI Console */
+        .ai-card {
+            border: 1px solid rgba(0,212,170,0.3);
+            background: rgba(0,212,170,0.03);
+        }
+
+        .ai-input {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: monospace;
+            font-size: 0.8rem;
+            resize: vertical;
+        }
+
+        .ai-output {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            background: #0a1520;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--accent);
+            font-family: monospace;
+            font-size: 0.75rem;
+            margin-top: 10px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        /* RTL support */
+        [dir="rtl"] .lang-selector { left: 16px; right: auto; }
+        [dir="rtl"] .header { text-align: center; }
+
+        /* Update banner */
+        .update-banner {
+            max-width: 520px;
+            margin: 0 auto 14px;
+            padding: 12px 16px;
+            background: linear-gradient(90deg, rgba(0,212,170,0.18), rgba(0,212,170,0.05));
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.85rem;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .update-banner.show { display: flex; }
+
+        /* Connection status dot */
+        .conn-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-top: 10px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #6b7785; flex-shrink: 0; }
+        .status-dot.connected { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .status-dot.error { background: #ff5d5d; }
+        .status-dot.connecting { background: #f5b942; }
+
+        /* Diagnostic issues */
+        .issue { border-left: 3px solid #6b7785; padding: 8px 12px; margin: 8px 0; background: rgba(255,255,255,0.03); border-radius: 0 6px 6px 0; font-size: 0.82rem; }
+        .issue.critical { border-left-color: #ff5d5d; }
+        .issue.warning { border-left-color: #f5b942; }
+        .issue.info { border-left-color: var(--accent); }
+        .issue .issue-code { font-weight: 700; color: var(--accent); }
+        .issue .issue-sol { color: var(--text-muted); margin-top: 4px; }
+        .diag-summary { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
+
+        /* Responsive */
+        @media (max-width: 400px) {
+            .container { padding: 0 10px 30px; }
+            .card { padding: 18px; }
+            .btn-group { flex-direction: column; }
+            .input-row { grid-template-columns: 1fr; }
+            .lang-selector { position: static; text-align: right; margin-bottom: 10px; }
+        }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>⚡ Generator PLC Multiplataforma</h2>
-    
-    <label>Tipo de PLC:</label>
-    <select id="plcType">
-        <option value="Allen-Bradley">Allen-Bradley</option>
-        <option value="Siemens">Siemens</option>
-        <option value="Mitsubishi">Mitsubishi</option>
-    </select>
+<div id="notifications"></div>
 
-    <label>Número de Entradas:</label>
-    <input type="number" id="inputs" value="0" min="0">
+<div class="update-banner" id="updateBanner">
+    <span id="updateText">&#128260; Hay una nueva versión disponible.</span>
+    <button class="btn btn-primary btn-sm" onclick="applyAppUpdate()">Actualizar</button>
+</div>
 
-    <label>Número de Salidas:</label>
-    <input type="number" id="outputs" value="0" min="0">
+<div class="lang-selector">
+    <select id="langSelect" onchange="changeLanguage(this.value)"></select>
+</div>
 
-    <button onclick="processPLC()">Generar Código</button>
+<div class="header">
+    <div class="logo">
+        <div class="logo-icon">&#9889;</div>
+        <h1 id="appTitle">PLC Code Generator Pro</h1>
+    </div>
+    <p class="subtitle" id="appSubtitle">Generador de código para todos los PLCs del mercado</p>
+    <div class="platforms">
+        <span class="platform-badge">&#128187; Windows</span>
+        <span class="platform-badge">&#127822; iOS</span>
+        <span class="platform-badge">&#129302; Android</span>
+    </div>
+</div>
 
-    <label>Código Resultante:</label>
-    <textarea id="codeOutput" rows="8" readonly></textarea>
+<div class="container">
+    <!-- Selector de PLC -->
+    <div class="card">
+        <div class="card-title">Configuración</div>
+        
+        <label for="plcType">Tipo de PLC</label>
+        <select id="plcType" onchange="updateBrandInfo()">
+            <!-- Populated by initUI() -->
+        </select>
+        <div class="brand-info" id="brandInfo"></div>
+
+        <div class="input-row">
+            <div>
+                <label for="inputs">Entradas (I)</label>
+                <input type="number" id="inputs" value="4" min="0" max="256">
+            </div>
+            <div>
+                <label for="outputs">Salidas (O)</label>
+                <input type="number" id="outputs" value="2" min="0" max="256">
+            </div>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="processPLC()">
+                &#9889; Generar Código
+            </button>
+        </div>
+    </div>
+
+    <!-- Código generado -->
+    <div class="card">
+        <div class="card-title">Código Generado</div>
+        <div class="code-area">
+            <textarea id="codeOutput" readonly placeholder="El código generado aparecerá aquí..."></textarea>
+        </div>
+        <div class="code-actions">
+            <button class="btn btn-secondary btn-sm" onclick="copyCode()">&#128203; Copiar</button>
+            <button class="btn btn-secondary btn-sm" onclick="downloadCode()">&#128229; Descargar .txt</button>
+        </div>
+    </div>
+
+    <!-- Diagnóstico y solución de problemas -->
+    <div class="card">
+        <div class="card-title">&#128295; Diagnóstico y Códigos de Error</div>
+        <div class="btn-group" style="margin-bottom:10px;">
+            <button class="btn btn-secondary btn-sm" onclick="analyzeCurrentCode()">&#128269; Analizar código generado</button>
+        </div>
+        <label for="symptomInput">Describe el problema o avería</label>
+        <input type="text" id="symptomInput" placeholder="ej. fallo de bus, watchdog, timeout de comunicación">
+        <div class="input-row" style="margin-top:10px;">
+            <div>
+                <label for="diagBrand">Marca (opcional)</label>
+                <select id="diagBrand"><option value="">Todas</option></select>
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+                <button class="btn btn-primary btn-sm" style="width:100%;" onclick="runDiagnose()">Diagnosticar</button>
+            </div>
+        </div>
+        <div id="diagResults"></div>
+    </div>
+
+    <!-- Conexión remota -->
+    <div class="card">
+        <div class="card-title">&#128225; Conexión Remota</div>
+        <label for="protocolSelect">Protocolo</label>
+        <select id="protocolSelect"></select>
+        <div class="input-row" style="margin-top:10px;">
+            <div>
+                <label for="hostInput">Host / IP</label>
+                <input type="text" id="hostInput" placeholder="192.168.0.10">
+            </div>
+            <div>
+                <label for="portInput">Puerto</label>
+                <input type="number" id="portInput" placeholder="502" min="1" max="65535">
+            </div>
+        </div>
+        <label for="modeSelect" style="margin-top:10px;">Modo</label>
+        <select id="modeSelect">
+            <option value="simulation">Simulación (demo en navegador)</option>
+            <option value="gateway">Gateway WebSocket / Electron</option>
+        </select>
+        <div class="conn-status">
+            <span class="status-dot" id="connDot"></span>
+            <span id="connStatusText">Desconectado</span>
+        </div>
+        <div class="btn-group" style="margin-top:10px;">
+            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="doConnect()">Conectar</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="doDisconnect()">Desconectar</button>
+        </div>
+        <div class="input-row" style="margin-top:10px;">
+            <div>
+                <label for="regAddress">Registro</label>
+                <input type="text" id="regAddress" placeholder="40001">
+            </div>
+            <div>
+                <label for="regValue">Valor (escribir)</label>
+                <input type="number" id="regValue" placeholder="0">
+            </div>
+        </div>
+        <div class="btn-group" style="margin-top:10px;">
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="doRead()">Leer</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="doWrite()">Escribir</button>
+        </div>
+        <div class="ai-output" id="remoteOutput" style="margin-top:10px;">// Resultado de lectura/escritura...</div>
+    </div>
+</div>
+
+    <!-- Consola IA -->
+    <div class="card ai-card">
+        <div class="card-title" id="aiTitle">&#129302; Consola IA</div>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;" id="aiDescription">
+            Envía comandos JSON para que cualquier IA gestione el generador.
+            Escribe <code>{"action":"help"}</code> para ver todos los comandos.
+        </p>
+        <textarea class="ai-input" id="aiInput" placeholder='{"action": "generate", "plcType": "Siemens (S7-1200/1500)", "inputs": 4, "outputs": 2}'></textarea>
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="executeAI()" style="flex:2">&#9889; Ejecutar</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('aiInput').value=JSON.stringify({action:'help'},null,2)">? Help</button>
+        </div>
+        <div class="ai-output" id="aiOutput">// Respuesta de la API aparecerá aquí...</div>
+    </div>
+</div>
+
+<div class="footer" id="appFooter">
+    PLC Code Generator Pro v3.0 &mdash; Multiplataforma<br>
+    Compatible con 35+ marcas de PLCs industriales
 </div>
 
 <script src="src/plc.js"></script>
+<script src="src/i18n.js"></script>
+<script src="src/diagnostics.js"></script>
+<script src="src/remote.js"></script>
+<script src="src/updater.js"></script>
+<script src="src/ai-interface.js"></script>
 <script src="src/ui.js"></script>
+<script>
+    // Inicializar idiomas
+    function initLanguageSelector() {
+        const select = document.getElementById("langSelect");
+        if (!select) return;
+        const langs = getAvailableLanguages();
+        select.innerHTML = langs.map(l => 
+            `<option value="${l.code}">${l.native}</option>`
+        ).join("");
+        select.value = getCurrentLanguage();
+    }
+
+    function changeLanguage(code) {
+        setLanguage(code);
+        applyTranslations();
+        document.documentElement.dir = getTextDirection();
+    }
+
+    function applyTranslations() {
+        document.getElementById("appTitle").textContent = t("title");
+        document.getElementById("appSubtitle").textContent = t("subtitle");
+        document.getElementById("appFooter").innerHTML = 
+            `PLC Code Generator Pro v3.0 &mdash; ${t("footer")}`;
+    }
+
+    // Consola IA
+    function executeAI() {
+        const input = document.getElementById("aiInput").value.trim();
+        const output = document.getElementById("aiOutput");
+        try {
+            const command = JSON.parse(input);
+            const result = PLCInterface.execute(command);
+            output.textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+            output.textContent = JSON.stringify({
+                status: "error",
+                error: "JSON inválido: " + e.message
+            }, null, 2);
+        }
+    }
+
+    // ---------- Diagnóstico ----------
+    function initDiagnostics() {
+        const sel = document.getElementById("diagBrand");
+        if (!sel || typeof getDiagnosticBrands !== "function") return;
+        getDiagnosticBrands().forEach(b => {
+            const opt = document.createElement("option");
+            opt.value = b; opt.textContent = b;
+            sel.appendChild(opt);
+        });
+    }
+
+    function renderIssues(container, issues, emptyMsg) {
+        if (!issues || issues.length === 0) {
+            container.innerHTML = `<div class="diag-summary">${emptyMsg}</div>`;
+            return;
+        }
+        container.innerHTML = issues.map(i => `
+            <div class="issue ${i.severity}">
+                <span class="issue-code">${i.code || ""}</span> ${i.title || ""}
+                ${i.brand ? `<span class="diag-summary"> [${i.brand}]</span>` : ""}
+                <div>${i.cause || ""}</div>
+                <div class="issue-sol">&#128161; ${i.solution || ""}</div>
+            </div>`).join("");
+    }
+
+    function analyzeCurrentCode() {
+        const code = document.getElementById("codeOutput").value;
+        const res = analyzeCode(code);
+        const container = document.getElementById("diagResults");
+        const head = `<div class="diag-summary">Críticos: ${res.summary.critical} · Avisos: ${res.summary.warnings} · Info: ${res.summary.info}</div>`;
+        container.innerHTML = head;
+        const wrap = document.createElement("div");
+        renderIssues(wrap, res.issues, "Sin problemas detectados. &#9989;");
+        container.appendChild(wrap);
+    }
+
+    function runDiagnose() {
+        const symptom = document.getElementById("symptomInput").value;
+        const brand = document.getElementById("diagBrand").value || undefined;
+        const res = diagnose(symptom, brand);
+        renderIssues(document.getElementById("diagResults"), res.matches,
+            "No se encontraron coincidencias. Prueba otras palabras clave.");
+    }
+
+    // ---------- Conexión remota ----------
+    let connection = null;
+
+    function initRemote() {
+        const sel = document.getElementById("protocolSelect");
+        if (!sel || typeof getProtocols !== "function") return;
+        sel.innerHTML = getProtocols().map(p =>
+            `<option value="${p.id}" data-port="${p.defaultPort}">${p.name} (:${p.defaultPort})</option>`
+        ).join("");
+        const portInput = document.getElementById("portInput");
+        const syncPort = () => {
+            const opt = sel.options[sel.selectedIndex];
+            if (opt) portInput.value = opt.getAttribute("data-port");
+        };
+        sel.addEventListener("change", syncPort);
+        syncPort();
+        connection = createConnection();
+        connection.on("status", updateConnUI);
+    }
+
+    function updateConnUI() {
+        const st = connection ? connection.getStatus() : { status: "disconnected" };
+        const dot = document.getElementById("connDot");
+        const text = document.getElementById("connStatusText");
+        dot.className = "status-dot " + (st.status === "connected" ? "connected" : st.status === "error" ? "error" : st.status === "connecting" ? "connecting" : "");
+        const labels = { connected: "Conectado", error: "Error", connecting: "Conectando...", disconnected: "Desconectado" };
+        text.textContent = labels[st.status] || st.status;
+    }
+
+    function doConnect() {
+        const cfg = {
+            protocol: document.getElementById("protocolSelect").value,
+            host: document.getElementById("hostInput").value,
+            port: parseInt(document.getElementById("portInput").value, 10) || undefined,
+            mode: document.getElementById("modeSelect").value
+        };
+        connection.connect(cfg)
+            .then(() => { updateConnUI(); notify("Conexión establecida (" + cfg.mode + ")", "success"); })
+            .catch(err => { updateConnUI(); notify("Error: " + err.message, "error"); });
+    }
+
+    function doDisconnect() {
+        if (connection) { connection.disconnect(); updateConnUI(); }
+    }
+
+    function doRead() {
+        const address = document.getElementById("regAddress").value;
+        const out = document.getElementById("remoteOutput");
+        if (!connection || !connection.isConnected()) { out.textContent = "// No conectado"; return; }
+        connection.readRegister(address)
+            .then(r => { out.textContent = JSON.stringify(r, null, 2); })
+            .catch(e => { out.textContent = "// Error: " + e.message; });
+    }
+
+    function doWrite() {
+        const address = document.getElementById("regAddress").value;
+        const value = parseFloat(document.getElementById("regValue").value);
+        const out = document.getElementById("remoteOutput");
+        if (!connection || !connection.isConnected()) { out.textContent = "// No conectado"; return; }
+        connection.writeRegister(address, value)
+            .then(r => { out.textContent = JSON.stringify(r, null, 2); })
+            .catch(e => { out.textContent = "// Error: " + e.message; });
+    }
+
+    function notify(msg, type) {
+        if (typeof showNotification === "function") { showNotification(msg, type); }
+    }
+
+    // ---------- Actualización automática ----------
+    let swRegistration = null;
+
+    function applyAppUpdate() {
+        if (typeof applyUpdate === "function") {
+            applyUpdate(swRegistration);
+        } else {
+            location.reload();
+        }
+    }
+
+    function initUpdater() {
+        if (typeof registerServiceWorker !== "function") {
+            if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+            return;
+        }
+        registerServiceWorker({
+            swPath: "sw.js",
+            onUpdate: () => {
+                document.getElementById("updateBanner").classList.add("show");
+            }
+        }).then(reg => { swRegistration = reg; }).catch(() => {});
+
+        // Comprobar version.json contra la versión instalada
+        if (typeof checkForUpdate === "function") {
+            checkForUpdate({ current: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "3.0.0") })
+                .then(info => {
+                    if (info.updateAvailable) {
+                        const txt = document.getElementById("updateText");
+                        if (txt) txt.innerHTML = `&#128260; Nueva versión ${info.latest} disponible.`;
+                        document.getElementById("updateBanner").classList.add("show");
+                    }
+                })
+                .catch(() => {});
+        }
+    }
+
+    // Inicialización
+    document.addEventListener("DOMContentLoaded", () => {
+        initUI();
+        initLanguageSelector();
+        initDiagnostics();
+        initRemote();
+        initUpdater();
+    });
+
+    // Exponer módulos globalmente para acceso externo por IAs
+    window.PLCInterface = PLCInterface;
+</script>
 
 </body>
 </html>
