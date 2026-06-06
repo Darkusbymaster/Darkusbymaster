@@ -1,9 +1,15 @@
-const CACHE_NAME = "plc-generator-v2";
+const CACHE_NAME = "plc-generator-v3";
 const ASSETS = [
     "./index.html",
+    "./manifest.json",
+    "./version.json",
     "./src/plc.js",
-    "./src/ui.js",
-    "./manifest.json"
+    "./src/i18n.js",
+    "./src/ai-interface.js",
+    "./src/diagnostics.js",
+    "./src/remote.js",
+    "./src/updater.js",
+    "./src/ui.js"
 ];
 
 self.addEventListener("install", (event) => {
@@ -22,8 +28,21 @@ self.addEventListener("activate", (event) => {
     self.clients.claim();
 });
 
+// Permite que la página fuerce la activación del nuevo worker (auto-update).
+self.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "SKIP_WAITING") {
+        self.skipWaiting();
+    }
+});
+
 self.addEventListener("fetch", (event) => {
+    const req = event.request;
+    // version.json siempre desde la red para detectar actualizaciones.
+    if (req.url.indexOf("version.json") !== -1) {
+        event.respondWith(fetch(req).catch(() => caches.match(req)));
+        return;
+    }
     event.respondWith(
-        caches.match(event.request).then((cached) => cached || fetch(event.request))
+        caches.match(req).then((cached) => cached || fetch(req))
     );
 });

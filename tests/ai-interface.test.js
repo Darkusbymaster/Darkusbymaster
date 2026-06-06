@@ -4,6 +4,9 @@
 
 const { plcTypes, getPLCCategories, generatePLCCode, repairPLCCode } = require("../src/plc.js");
 const { getAvailableLanguages, setLanguage, getCurrentLanguage } = require("../src/i18n.js");
+const { analyzeCode, diagnose, lookupErrorCode } = require("../src/diagnostics.js");
+const { createConnection } = require("../src/remote.js");
+const { APP_VERSION } = require("../src/updater.js");
 
 // Exponer globales que ai-interface necesita
 global.plcTypes = plcTypes;
@@ -13,12 +16,17 @@ global.repairPLCCode = repairPLCCode;
 global.getAvailableLanguages = getAvailableLanguages;
 global.setLanguage = setLanguage;
 global.getCurrentLanguage = getCurrentLanguage;
+global.analyzeCode = analyzeCode;
+global.diagnose = diagnose;
+global.lookupErrorCode = lookupErrorCode;
+global.createConnection = createConnection;
+global.APP_VERSION = APP_VERSION;
 
 const { PLCInterface } = require("../src/ai-interface.js");
 
 describe("PLCInterface", () => {
     test("debe tener versión definida", () => {
-        expect(PLCInterface.version).toBe("2.0.0");
+        expect(PLCInterface.version).toBe("3.0.0");
     });
 
     test("debe tener esquema de acciones", () => {
@@ -261,5 +269,83 @@ describe("PLCInterface - action: batch", () => {
     test("debe fallar si commands no es array", () => {
         const result = PLCInterface.execute({ action: "batch", commands: "invalid" });
         expect(result.status).toBe("error");
+    });
+});
+
+describe("PLCInterface - action: analyze / diagnose / errorCode", () => {
+    test("analyze detecta problemas con códigos de error", () => {
+        const result = PLCInterface.execute({ action: "analyze", code: "" });
+        expect(result.status).toBe("ok");
+        expect(result.data.issues.some(i => i.code === "E001")).toBe(true);
+    });
+
+    test("analyze falla sin code", () => {
+        expect(PLCInterface.execute({ action: "analyze" }).status).toBe("error");
+    });
+
+    test("diagnose devuelve coincidencias", () => {
+        const result = PLCInterface.execute({ action: "diagnose", symptom: "fallo de bus" });
+        expect(result.status).toBe("ok");
+        expect(result.data.total).toBeGreaterThan(0);
+    });
+
+    test("diagnose falla sin symptom", () => {
+        expect(PLCInterface.execute({ action: "diagnose" }).status).toBe("error");
+    });
+
+    test("errorCode busca un código conocido", () => {
+        const result = PLCInterface.execute({ action: "errorCode", brand: "Siemens", code: "SF" });
+        expect(result.status).toBe("ok");
+        expect(result.data).toHaveProperty("solution");
+    });
+
+    test("errorCode falla con código inexistente", () => {
+        const result = PLCInterface.execute({ action: "errorCode", brand: "Siemens", code: "ZZZ" });
+        expect(result.status).toBe("error");
+    });
+});
+
+describe("PLCInterface - conexión remota", () => {
+    test("connect en simulación y luego read/write", () => {
+        const c = PLCInterface.execute({ action: "connect", protocol: "modbus-tcp", mode: "simulation" });
+        expect(c.status).toBe("ok");
+        expect(c.data.connected).toBe(true);
+
+        const w = PLCInterface.execute({ action: "write", address: "40001", value: 55 });
+        expect(w.status).toBe("ok");
+
+        const r = PLCInterface.execute({ action: "read", address: "40001" });
+        expect(r.status).toBe("ok");
+        expect(r.data.value).toBe(55);
+    });
+
+    test("connectionStatus refleja conexión", () => {
+        PLCInterface.execute({ action: "connect", protocol: "modbus-tcp", mode: "simulation" });
+        const s = PLCInterface.execute({ action: "connectionStatus" });
+        expect(s.data.connected).toBe(true);
+    });
+
+    test("disconnect cierra la conexión", () => {
+        PLCInterface.execute({ action: "connect", protocol: "modbus-tcp", mode: "simulation" });
+        const d = PLCInterface.execute({ action: "disconnect" });
+        expect(d.data.status).toBe("disconnected");
+    });
+
+    test("connect con protocolo inválido falla", () => {
+        const c = PLCInterface.execute({ action: "connect", protocol: "xyz", mode: "simulation" });
+        expect(c.status).toBe("error");
+    });
+
+    test("modo no simulación es rechazado en la interfaz IA", () => {
+        const c = PLCInterface.execute({ action: "connect", protocol: "modbus-tcp", mode: "gateway", host: "1.2.3.4" });
+        expect(c.status).toBe("error");
+    });
+});
+
+describe("PLCInterface - checkUpdate", () => {
+    test("devuelve versión actual", () => {
+        const result = PLCInterface.execute({ action: "checkUpdate" });
+        expect(result.status).toBe("ok");
+        expect(result.data).toHaveProperty("current");
     });
 });

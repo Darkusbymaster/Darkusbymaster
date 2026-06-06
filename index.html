@@ -366,6 +366,39 @@
         [dir="rtl"] .lang-selector { left: 16px; right: auto; }
         [dir="rtl"] .header { text-align: center; }
 
+        /* Update banner */
+        .update-banner {
+            max-width: 520px;
+            margin: 0 auto 14px;
+            padding: 12px 16px;
+            background: linear-gradient(90deg, rgba(0,212,170,0.18), rgba(0,212,170,0.05));
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 0.85rem;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .update-banner.show { display: flex; }
+
+        /* Connection status dot */
+        .conn-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; margin-top: 10px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #6b7785; flex-shrink: 0; }
+        .status-dot.connected { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+        .status-dot.error { background: #ff5d5d; }
+        .status-dot.connecting { background: #f5b942; }
+
+        /* Diagnostic issues */
+        .issue { border-left: 3px solid #6b7785; padding: 8px 12px; margin: 8px 0; background: rgba(255,255,255,0.03); border-radius: 0 6px 6px 0; font-size: 0.82rem; }
+        .issue.critical { border-left-color: #ff5d5d; }
+        .issue.warning { border-left-color: #f5b942; }
+        .issue.info { border-left-color: var(--accent); }
+        .issue .issue-code { font-weight: 700; color: var(--accent); }
+        .issue .issue-sol { color: var(--text-muted); margin-top: 4px; }
+        .diag-summary { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; }
+
         /* Responsive */
         @media (max-width: 400px) {
             .container { padding: 0 10px 30px; }
@@ -379,6 +412,11 @@
 <body>
 
 <div id="notifications"></div>
+
+<div class="update-banner" id="updateBanner">
+    <span id="updateText">&#128260; Hay una nueva versión disponible.</span>
+    <button class="btn btn-primary btn-sm" onclick="applyAppUpdate()">Actualizar</button>
+</div>
 
 <div class="lang-selector">
     <select id="langSelect" onchange="changeLanguage(this.value)"></select>
@@ -437,6 +475,71 @@
             <button class="btn btn-secondary btn-sm" onclick="downloadCode()">&#128229; Descargar .txt</button>
         </div>
     </div>
+
+    <!-- Diagnóstico y solución de problemas -->
+    <div class="card">
+        <div class="card-title">&#128295; Diagnóstico y Códigos de Error</div>
+        <div class="btn-group" style="margin-bottom:10px;">
+            <button class="btn btn-secondary btn-sm" onclick="analyzeCurrentCode()">&#128269; Analizar código generado</button>
+        </div>
+        <label for="symptomInput">Describe el problema o avería</label>
+        <input type="text" id="symptomInput" placeholder="ej. fallo de bus, watchdog, timeout de comunicación">
+        <div class="input-row" style="margin-top:10px;">
+            <div>
+                <label for="diagBrand">Marca (opcional)</label>
+                <select id="diagBrand"><option value="">Todas</option></select>
+            </div>
+            <div style="display:flex; align-items:flex-end;">
+                <button class="btn btn-primary btn-sm" style="width:100%;" onclick="runDiagnose()">Diagnosticar</button>
+            </div>
+        </div>
+        <div id="diagResults"></div>
+    </div>
+
+    <!-- Conexión remota -->
+    <div class="card">
+        <div class="card-title">&#128225; Conexión Remota</div>
+        <label for="protocolSelect">Protocolo</label>
+        <select id="protocolSelect"></select>
+        <div class="input-row" style="margin-top:10px;">
+            <div>
+                <label for="hostInput">Host / IP</label>
+                <input type="text" id="hostInput" placeholder="192.168.0.10">
+            </div>
+            <div>
+                <label for="portInput">Puerto</label>
+                <input type="number" id="portInput" placeholder="502" min="1" max="65535">
+            </div>
+        </div>
+        <label for="modeSelect" style="margin-top:10px;">Modo</label>
+        <select id="modeSelect">
+            <option value="simulation">Simulación (demo en navegador)</option>
+            <option value="gateway">Gateway WebSocket / Electron</option>
+        </select>
+        <div class="conn-status">
+            <span class="status-dot" id="connDot"></span>
+            <span id="connStatusText">Desconectado</span>
+        </div>
+        <div class="btn-group" style="margin-top:10px;">
+            <button class="btn btn-primary btn-sm" style="flex:1;" onclick="doConnect()">Conectar</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="doDisconnect()">Desconectar</button>
+        </div>
+        <div class="input-row" style="margin-top:10px;">
+            <div>
+                <label for="regAddress">Registro</label>
+                <input type="text" id="regAddress" placeholder="40001">
+            </div>
+            <div>
+                <label for="regValue">Valor (escribir)</label>
+                <input type="number" id="regValue" placeholder="0">
+            </div>
+        </div>
+        <div class="btn-group" style="margin-top:10px;">
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="doRead()">Leer</button>
+            <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="doWrite()">Escribir</button>
+        </div>
+        <div class="ai-output" id="remoteOutput" style="margin-top:10px;">// Resultado de lectura/escritura...</div>
+    </div>
 </div>
 
     <!-- Consola IA -->
@@ -456,12 +559,15 @@
 </div>
 
 <div class="footer" id="appFooter">
-    PLC Code Generator Pro v2.0 &mdash; Multiplataforma<br>
+    PLC Code Generator Pro v3.0 &mdash; Multiplataforma<br>
     Compatible con 35+ marcas de PLCs industriales
 </div>
 
 <script src="src/plc.js"></script>
 <script src="src/i18n.js"></script>
+<script src="src/diagnostics.js"></script>
+<script src="src/remote.js"></script>
+<script src="src/updater.js"></script>
 <script src="src/ai-interface.js"></script>
 <script src="src/ui.js"></script>
 <script>
@@ -486,7 +592,7 @@
         document.getElementById("appTitle").textContent = t("title");
         document.getElementById("appSubtitle").textContent = t("subtitle");
         document.getElementById("appFooter").innerHTML = 
-            `PLC Code Generator Pro v2.0 &mdash; ${t("footer")}`;
+            `PLC Code Generator Pro v3.0 &mdash; ${t("footer")}`;
     }
 
     // Consola IA
@@ -505,18 +611,165 @@
         }
     }
 
+    // ---------- Diagnóstico ----------
+    function initDiagnostics() {
+        const sel = document.getElementById("diagBrand");
+        if (!sel || typeof getDiagnosticBrands !== "function") return;
+        getDiagnosticBrands().forEach(b => {
+            const opt = document.createElement("option");
+            opt.value = b; opt.textContent = b;
+            sel.appendChild(opt);
+        });
+    }
+
+    function renderIssues(container, issues, emptyMsg) {
+        if (!issues || issues.length === 0) {
+            container.innerHTML = `<div class="diag-summary">${emptyMsg}</div>`;
+            return;
+        }
+        container.innerHTML = issues.map(i => `
+            <div class="issue ${i.severity}">
+                <span class="issue-code">${i.code || ""}</span> ${i.title || ""}
+                ${i.brand ? `<span class="diag-summary"> [${i.brand}]</span>` : ""}
+                <div>${i.cause || ""}</div>
+                <div class="issue-sol">&#128161; ${i.solution || ""}</div>
+            </div>`).join("");
+    }
+
+    function analyzeCurrentCode() {
+        const code = document.getElementById("codeOutput").value;
+        const res = analyzeCode(code);
+        const container = document.getElementById("diagResults");
+        const head = `<div class="diag-summary">Críticos: ${res.summary.critical} · Avisos: ${res.summary.warnings} · Info: ${res.summary.info}</div>`;
+        container.innerHTML = head;
+        const wrap = document.createElement("div");
+        renderIssues(wrap, res.issues, "Sin problemas detectados. &#9989;");
+        container.appendChild(wrap);
+    }
+
+    function runDiagnose() {
+        const symptom = document.getElementById("symptomInput").value;
+        const brand = document.getElementById("diagBrand").value || undefined;
+        const res = diagnose(symptom, brand);
+        renderIssues(document.getElementById("diagResults"), res.matches,
+            "No se encontraron coincidencias. Prueba otras palabras clave.");
+    }
+
+    // ---------- Conexión remota ----------
+    let connection = null;
+
+    function initRemote() {
+        const sel = document.getElementById("protocolSelect");
+        if (!sel || typeof getProtocols !== "function") return;
+        sel.innerHTML = getProtocols().map(p =>
+            `<option value="${p.id}" data-port="${p.defaultPort}">${p.name} (:${p.defaultPort})</option>`
+        ).join("");
+        const portInput = document.getElementById("portInput");
+        const syncPort = () => {
+            const opt = sel.options[sel.selectedIndex];
+            if (opt) portInput.value = opt.getAttribute("data-port");
+        };
+        sel.addEventListener("change", syncPort);
+        syncPort();
+        connection = createConnection();
+        connection.on("status", updateConnUI);
+    }
+
+    function updateConnUI() {
+        const st = connection ? connection.getStatus() : { status: "disconnected" };
+        const dot = document.getElementById("connDot");
+        const text = document.getElementById("connStatusText");
+        dot.className = "status-dot " + (st.status === "connected" ? "connected" : st.status === "error" ? "error" : st.status === "connecting" ? "connecting" : "");
+        const labels = { connected: "Conectado", error: "Error", connecting: "Conectando...", disconnected: "Desconectado" };
+        text.textContent = labels[st.status] || st.status;
+    }
+
+    function doConnect() {
+        const cfg = {
+            protocol: document.getElementById("protocolSelect").value,
+            host: document.getElementById("hostInput").value,
+            port: parseInt(document.getElementById("portInput").value, 10) || undefined,
+            mode: document.getElementById("modeSelect").value
+        };
+        connection.connect(cfg)
+            .then(() => { updateConnUI(); notify("Conexión establecida (" + cfg.mode + ")", "success"); })
+            .catch(err => { updateConnUI(); notify("Error: " + err.message, "error"); });
+    }
+
+    function doDisconnect() {
+        if (connection) { connection.disconnect(); updateConnUI(); }
+    }
+
+    function doRead() {
+        const address = document.getElementById("regAddress").value;
+        const out = document.getElementById("remoteOutput");
+        if (!connection || !connection.isConnected()) { out.textContent = "// No conectado"; return; }
+        connection.readRegister(address)
+            .then(r => { out.textContent = JSON.stringify(r, null, 2); })
+            .catch(e => { out.textContent = "// Error: " + e.message; });
+    }
+
+    function doWrite() {
+        const address = document.getElementById("regAddress").value;
+        const value = parseFloat(document.getElementById("regValue").value);
+        const out = document.getElementById("remoteOutput");
+        if (!connection || !connection.isConnected()) { out.textContent = "// No conectado"; return; }
+        connection.writeRegister(address, value)
+            .then(r => { out.textContent = JSON.stringify(r, null, 2); })
+            .catch(e => { out.textContent = "// Error: " + e.message; });
+    }
+
+    function notify(msg, type) {
+        if (typeof showNotification === "function") { showNotification(msg, type); }
+    }
+
+    // ---------- Actualización automática ----------
+    let swRegistration = null;
+
+    function applyAppUpdate() {
+        if (typeof applyUpdate === "function") {
+            applyUpdate(swRegistration);
+        } else {
+            location.reload();
+        }
+    }
+
+    function initUpdater() {
+        if (typeof registerServiceWorker !== "function") {
+            if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+            return;
+        }
+        registerServiceWorker({
+            swPath: "sw.js",
+            onUpdate: () => {
+                document.getElementById("updateBanner").classList.add("show");
+            }
+        }).then(reg => { swRegistration = reg; }).catch(() => {});
+
+        // Comprobar version.json contra la versión instalada
+        if (typeof checkForUpdate === "function") {
+            checkForUpdate({ current: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "3.0.0") })
+                .then(info => {
+                    if (info.updateAvailable) {
+                        const txt = document.getElementById("updateText");
+                        if (txt) txt.innerHTML = `&#128260; Nueva versión ${info.latest} disponible.`;
+                        document.getElementById("updateBanner").classList.add("show");
+                    }
+                })
+                .catch(() => {});
+        }
+    }
+
     // Inicialización
     document.addEventListener("DOMContentLoaded", () => {
         initUI();
         initLanguageSelector();
+        initDiagnostics();
+        initRemote();
+        initUpdater();
     });
 
-    // PWA Service Worker registration
-    if ("serviceWorker" in navigator) {
-        navigator.serviceWorker.register("sw.js").catch(() => {});
-    }
-
-    // Exponer PLCInterface globalmente para acceso externo por IAs
+    // Exponer módulos globalmente para acceso externo por IAs
     window.PLCInterface = PLCInterface;
 </script>
 

@@ -1,0 +1,6 @@
+{
+  "version": "3.0.0",
+  "releaseDate": "2026-06-06",
+  "notes": "Diagnóstico con códigos de error, conexión remota (Modbus/OPC UA/EtherNet-IP) y actualización automática.",
+  "minSupported": "2.0.0"
+}

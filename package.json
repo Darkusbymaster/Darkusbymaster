@@ -1,6 +1,6 @@
 {
   "name": "plc-generator-pro",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "Generador de código PLC multiplataforma - 35+ marcas industriales (Windows, iOS, Android)",
   "main": "electron/main.js",
   "scripts": {

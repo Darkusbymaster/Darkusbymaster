@@ -9,6 +9,30 @@
   "parserOptions": {
     "ecmaVersion": "latest"
   },
+  "globals": {
+    "plcTypes": "readonly",
+    "getPLCCategories": "readonly",
+    "generatePLCCode": "readonly",
+    "repairPLCCode": "readonly",
+    "downloadFile": "readonly",
+    "getAvailableLanguages": "readonly",
+    "setLanguage": "readonly",
+    "getCurrentLanguage": "readonly",
+    "t": "readonly",
+    "analyzeCode": "readonly",
+    "diagnose": "readonly",
+    "lookupErrorCode": "readonly",
+    "getDiagnosticBrands": "readonly",
+    "listErrorCodes": "readonly",
+    "createConnection": "readonly",
+    "getProtocols": "readonly",
+    "APP_VERSION": "readonly",
+    "checkForUpdate": "readonly",
+    "registerServiceWorker": "readonly",
+    "applyUpdate": "readonly",
+    "showNotification": "readonly",
+    "PLCInterface": "readonly"
+  },
   "rules": {
     "no-unused-vars": "warn",
     "no-undef": "error"

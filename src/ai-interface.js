@@ -20,7 +20,7 @@ const PLCInterface = {
     /**
      * Versión de la API
      */
-    version: "2.0.0",
+    version: "3.0.0",
 
     /**
      * Esquema de comandos disponibles para la IA.
@@ -88,6 +88,67 @@ const PLCInterface = {
                 params: {},
                 returns: "Esquema completo de la API"
             },
+            analyze: {
+                description: "Analiza código PLC y devuelve problemas detectados con códigos de error",
+                params: {
+                    code: { type: "string", required: true, description: "Código PLC a analizar" }
+                },
+                returns: "Objeto con issues[], summary y estado ok"
+            },
+            diagnose: {
+                description: "Diagnostica un síntoma/avería y devuelve códigos de error, causa y solución",
+                params: {
+                    symptom: { type: "string", required: true, description: "Descripción del problema o síntoma" },
+                    brand: { type: "string", required: false, description: "Marca para acotar (Siemens, Allen-Bradley...)" }
+                },
+                returns: "Objeto con matches[] ordenados por relevancia"
+            },
+            errorCode: {
+                description: "Busca el significado de un código de error de una marca",
+                params: {
+                    brand: { type: "string", required: true, description: "Marca del PLC" },
+                    code: { type: "string", required: true, description: "Código de error a buscar" }
+                },
+                returns: "Entrada de error con causa y solución, o error si no existe"
+            },
+            connect: {
+                description: "Conecta de forma remota a un PLC (Modbus/OPC UA/EtherNet-IP). Por defecto en modo simulación.",
+                params: {
+                    protocol: { type: "string", required: true, description: "modbus-tcp | opc-ua | ethernet-ip | s7comm" },
+                    host: { type: "string", required: false, description: "IP del PLC o gateway (no requerido en simulación)" },
+                    port: { type: "number", required: false, description: "Puerto (por defecto según protocolo)" },
+                    mode: { type: "string", required: false, description: "simulation | gateway (por defecto simulation)" }
+                },
+                returns: "Estado de la conexión"
+            },
+            read: {
+                description: "Lee un registro del PLC conectado",
+                params: { address: { type: "string", required: true, description: "Dirección/registro (ej. 40001, %MW10)" } },
+                returns: "Objeto {address, value}"
+            },
+            write: {
+                description: "Escribe un valor en un registro del PLC conectado",
+                params: {
+                    address: { type: "string", required: true },
+                    value: { type: "number", required: true }
+                },
+                returns: "Objeto {address, value, ok}"
+            },
+            connectionStatus: {
+                description: "Devuelve el estado de la conexión remota actual",
+                params: {},
+                returns: "Estado de la conexión"
+            },
+            disconnect: {
+                description: "Cierra la conexión remota actual",
+                params: {},
+                returns: "Estado de la conexión"
+            },
+            checkUpdate: {
+                description: "Comprueba si hay una versión más reciente de la aplicación",
+                params: {},
+                returns: "Objeto con updateAvailable, current, latest y notas"
+            },
             batch: {
                 description: "Ejecuta múltiples comandos en secuencia",
                 params: {
@@ -97,6 +158,11 @@ const PLCInterface = {
             }
         }
     },
+
+    /**
+     * Conexión remota persistente compartida entre comandos.
+     */
+    _connection: null,
 
     /**
      * Ejecuta un comando de la IA.
@@ -128,6 +194,24 @@ const PLCInterface = {
                     return this._setLanguage(command);
                 case "help":
                     return this._help();
+                case "analyze":
+                    return this._analyze(command);
+                case "diagnose":
+                    return this._diagnose(command);
+                case "errorCode":
+                    return this._errorCode(command);
+                case "connect":
+                    return this._connect(command);
+                case "read":
+                    return this._read(command);
+                case "write":
+                    return this._write(command);
+                case "connectionStatus":
+                    return this._connectionStatus();
+                case "disconnect":
+                    return this._disconnect();
+                case "checkUpdate":
+                    return this._checkUpdate();
                 case "batch":
                     return this._batch(command);
                 default:
@@ -271,6 +355,112 @@ const PLCInterface = {
                 inputs: 4,
                 outputs: 2
             }
+        });
+    },
+
+    _analyze(cmd) {
+        if (typeof cmd.code !== "string") {
+            return this._error("Se requiere 'code' (string) para analizar");
+        }
+        if (typeof analyzeCode !== "function") {
+            return this._error("Módulo de diagnóstico no disponible");
+        }
+        return this._success(analyzeCode(cmd.code));
+    },
+
+    _diagnose(cmd) {
+        if (!cmd.symptom) {
+            return this._error("Se requiere 'symptom' con la descripción del problema");
+        }
+        if (typeof diagnose !== "function") {
+            return this._error("Módulo de diagnóstico no disponible");
+        }
+        return this._success(diagnose(cmd.symptom, cmd.brand));
+    },
+
+    _errorCode(cmd) {
+        if (!cmd.brand || !cmd.code) {
+            return this._error("Se requieren 'brand' y 'code'");
+        }
+        if (typeof lookupErrorCode !== "function") {
+            return this._error("Módulo de diagnóstico no disponible");
+        }
+        const entry = lookupErrorCode(cmd.brand, cmd.code);
+        if (!entry) {
+            return this._error(`Código '${cmd.code}' no encontrado para la marca '${cmd.brand}'`);
+        }
+        return this._success({ brand: cmd.brand, ...entry });
+    },
+
+    _connect(cmd) {
+        if (typeof createConnection !== "function") {
+            return this._error("Módulo de conexión remota no disponible");
+        }
+        const cfg = {
+            protocol: cmd.protocol,
+            host: cmd.host,
+            port: cmd.port,
+            mode: cmd.mode || "simulation",
+            slaveId: cmd.slaveId
+        };
+        if (!this._connection) {
+            this._connection = createConnection();
+        }
+        const validation = this._connection.validateConfig(cfg);
+        if (!validation.valid) {
+            return this._error(validation.errors.join("; "));
+        }
+        if (cfg.mode !== "simulation") {
+            return this._error("Conexión real requiere un gateway WebSocket. Use mode:'simulation' aquí o conecte desde el panel/Electron.");
+        }
+        // En simulación el estado se actualiza de forma síncrona.
+        this._connection.connect(cfg).catch(() => {});
+        return this._success(this._connection.getStatus());
+    },
+
+    _read(cmd) {
+        if (!this._connection || !this._connection.isConnected()) {
+            return this._error("No conectado. Use 'connect' primero.");
+        }
+        if (!cmd.address) {
+            return this._error("Se requiere 'address'");
+        }
+        const regs = this._connection._state.registers;
+        const value = Object.prototype.hasOwnProperty.call(regs, cmd.address) ? regs[cmd.address] : 0;
+        return this._success({ address: cmd.address, value });
+    },
+
+    _write(cmd) {
+        if (!this._connection || !this._connection.isConnected()) {
+            return this._error("No conectado. Use 'connect' primero.");
+        }
+        if (!cmd.address || cmd.value === undefined) {
+            return this._error("Se requieren 'address' y 'value'");
+        }
+        this._connection.writeRegister(cmd.address, cmd.value).catch(() => {});
+        return this._success({ address: cmd.address, value: cmd.value, ok: true });
+    },
+
+    _connectionStatus() {
+        if (!this._connection) {
+            return this._success({ status: "disconnected", connected: false, config: null });
+        }
+        return this._success(this._connection.getStatus());
+    },
+
+    _disconnect() {
+        if (!this._connection) {
+            return this._success({ status: "disconnected" });
+        }
+        return this._success(this._connection.disconnect());
+    },
+
+    _checkUpdate() {
+        const current = (typeof APP_VERSION !== "undefined") ? APP_VERSION : this.version;
+        return this._success({
+            current,
+            apiVersion: this.version,
+            message: "Use updater.checkForUpdate() para comprobar contra el servidor (requiere fetch)."
         });
     },
 
