@@ -311,12 +311,67 @@
             font-size: 0.72rem;
         }
 
+        /* Language selector */
+        .lang-selector {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+        }
+
+        .lang-selector select {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+        }
+
+        /* AI Console */
+        .ai-card {
+            border: 1px solid rgba(0,212,170,0.3);
+            background: rgba(0,212,170,0.03);
+        }
+
+        .ai-input {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: monospace;
+            font-size: 0.8rem;
+            resize: vertical;
+        }
+
+        .ai-output {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            background: #0a1520;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--accent);
+            font-family: monospace;
+            font-size: 0.75rem;
+            margin-top: 10px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        /* RTL support */
+        [dir="rtl"] .lang-selector { left: 16px; right: auto; }
+        [dir="rtl"] .header { text-align: center; }
+
         /* Responsive */
         @media (max-width: 400px) {
             .container { padding: 0 10px 30px; }
             .card { padding: 18px; }
             .btn-group { flex-direction: column; }
             .input-row { grid-template-columns: 1fr; }
+            .lang-selector { position: static; text-align: right; margin-bottom: 10px; }
         }
     </style>
 </head>
@@ -324,12 +379,16 @@
 
 <div id="notifications"></div>
 
+<div class="lang-selector">
+    <select id="langSelect" onchange="changeLanguage(this.value)"></select>
+</div>
+
 <div class="header">
     <div class="logo">
         <div class="logo-icon">&#9889;</div>
-        <h1>PLC Code Generator Pro</h1>
+        <h1 id="appTitle">PLC Code Generator Pro</h1>
     </div>
-    <p class="subtitle">Generador de código para todos los PLCs del mercado</p>
+    <p class="subtitle" id="appSubtitle">Generador de código para todos los PLCs del mercado</p>
     <div class="platforms">
         <span class="platform-badge">&#128187; Windows</span>
         <span class="platform-badge">&#127822; iOS</span>
@@ -379,20 +438,85 @@
     </div>
 </div>
 
-<div class="footer">
+    <!-- Consola IA -->
+    <div class="card ai-card">
+        <div class="card-title" id="aiTitle">&#129302; Consola IA</div>
+        <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;" id="aiDescription">
+            Envía comandos JSON para que cualquier IA gestione el generador.
+            Escribe <code>{"action":"help"}</code> para ver todos los comandos.
+        </p>
+        <textarea class="ai-input" id="aiInput" placeholder='{"action": "generate", "plcType": "Siemens (S7-1200/1500)", "inputs": 4, "outputs": 2}'></textarea>
+        <div class="btn-group">
+            <button class="btn btn-primary" onclick="executeAI()" style="flex:2">&#9889; Ejecutar</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('aiInput').value=JSON.stringify({action:'help'},null,2)">? Help</button>
+        </div>
+        <div class="ai-output" id="aiOutput">// Respuesta de la API aparecerá aquí...</div>
+    </div>
+</div>
+
+<div class="footer" id="appFooter">
     PLC Code Generator Pro v2.0 &mdash; Multiplataforma<br>
     Compatible con 35+ marcas de PLCs industriales
 </div>
 
 <script src="src/plc.js"></script>
+<script src="src/i18n.js"></script>
+<script src="src/ai-interface.js"></script>
 <script src="src/ui.js"></script>
 <script>
-    document.addEventListener("DOMContentLoaded", initUI);
+    // Inicializar idiomas
+    function initLanguageSelector() {
+        const select = document.getElementById("langSelect");
+        if (!select) return;
+        const langs = getAvailableLanguages();
+        select.innerHTML = langs.map(l => 
+            `<option value="${l.code}">${l.native}</option>`
+        ).join("");
+        select.value = getCurrentLanguage();
+    }
+
+    function changeLanguage(code) {
+        setLanguage(code);
+        applyTranslations();
+        document.documentElement.dir = getTextDirection();
+    }
+
+    function applyTranslations() {
+        document.getElementById("appTitle").textContent = t("title");
+        document.getElementById("appSubtitle").textContent = t("subtitle");
+        document.getElementById("appFooter").innerHTML = 
+            `PLC Code Generator Pro v2.0 &mdash; ${t("footer")}`;
+    }
+
+    // Consola IA
+    function executeAI() {
+        const input = document.getElementById("aiInput").value.trim();
+        const output = document.getElementById("aiOutput");
+        try {
+            const command = JSON.parse(input);
+            const result = PLCInterface.execute(command);
+            output.textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+            output.textContent = JSON.stringify({
+                status: "error",
+                error: "JSON inválido: " + e.message
+            }, null, 2);
+        }
+    }
+
+    // Inicialización
+    document.addEventListener("DOMContentLoaded", () => {
+        initUI();
+        initLanguageSelector();
+    });
 
     // PWA Service Worker registration
     if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("sw.js").catch(() => {});
     }
+
+    // Exponer PLCInterface globalmente para acceso externo por IAs
+    window.PLCInterface = PLCInterface;
 </script>
 
 </body>
